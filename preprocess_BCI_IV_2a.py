@@ -26,8 +26,9 @@ _________________________________________
 def read_dataset_BCI_IV_2a(dirPath: str, saveDir: str):
     subjects_folders = [f for f in os.listdir(dirPath) if f.startswith("S")]
 
-    all_train_data = []
-    all_test_data = []
+    bci_dir = os.path.join(saveDir, "BCI_IV_2a")
+    os.makedirs(bci_dir, exist_ok=True)
+
 
     for subject in subjects_folders:
         train_data_file = os.path.join(dirPath, subject, f"A{subject[1:3]}T.gdf" )
@@ -37,7 +38,6 @@ def read_dataset_BCI_IV_2a(dirPath: str, saveDir: str):
         if os.path.exists(train_data_file):
             print(f"Reading training data from {subject}...")
             raw_train = mne.io.read_raw_gdf(train_data_file, preload=True)
-            all_train_data.append(raw_train)
         else:
             print(f"Missing training file: {train_data_file}")
 
@@ -45,7 +45,6 @@ def read_dataset_BCI_IV_2a(dirPath: str, saveDir: str):
         if os.path.exists(test_data_file):
             print(f"Reading test data from {subject}...")
             raw_test = mne.io.read_raw_gdf(test_data_file, preload=True)
-            all_test_data.append(raw_test)
         else:
             print(f"Missing test file: {test_data_file}")
 
@@ -55,23 +54,32 @@ def read_dataset_BCI_IV_2a(dirPath: str, saveDir: str):
 
         # Save preprocessed data for the subject
         if train_data is not None:
-            train_filename = os.path.join(saveDir, f"PA{subject[1:3]}T.fif")
-            train_data[0].save(train_filename)
+            train_filename = os.path.join(bci_dir, f"PA{subject[1:3]}T.fif")
+
+            if os.path.exists(train_filename):
+                os.remove(train_filename)
+
+            train_data.save(train_filename)
             print(f"Training data for subject {subject[1:3]} saved as {train_filename}")
 
         if test_data is not None:
-            test_filename = os.path.join(saveDir, f"PA{subject[1:3]}E.fif")
-            test_data[0].save(test_filename)
+            test_filename = os.path.join(bci_dir, f"PA{subject[1:3]}E.fif")
+
+            if os.path.exists(test_filename):
+                os.remove(test_filename)
+
+            test_data.save(test_filename)
             print(f"Testing data for subject {subject[1:3]} saved as {test_filename}")
         
 
 
 def preprocess_dataset_BCI_IV_2a(raw_data):
     events, event_id = mne.events_from_annotations(raw_data) # Extract events
-        
+    print("Extracted Events:", event_id)
+
     selected_event_id = {
-            '769': 1, # LEFT HAND
-            '770': 2  # RIGHT HAND
+        '769': 5,  # Left Hand
+        '770': 6   # Right Hand
     }
 
     raw_data.info['bads'] += ['EOG-left', 'EOG-central', 'EOG-right']
@@ -94,7 +102,6 @@ def main() -> None:
         os.makedirs(save_dir)
 
     read_dataset_BCI_IV_2a(root_dir, save_dir)
-
 
 if __name__ == "__main__":
     main()

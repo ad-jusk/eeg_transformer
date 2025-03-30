@@ -48,7 +48,7 @@ def plot_evoked_responses(save_dir: str):
     plt.tight_layout()
 
 def main():
-    processed_data_dir = "processed_data"  
+    processed_data_dir = "processed_data\BCI_IV_2a"  
 
     plot_evoked_responses(processed_data_dir)
     plt.show()
