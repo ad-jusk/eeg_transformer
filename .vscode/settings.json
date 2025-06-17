@@ -19,5 +19,6 @@
         "120"
     ],
     "notebook.formatOnSave.enabled": true,
+    "editor.formatOnSave": true,
     "git.ignoreLimitWarning": true
 }
