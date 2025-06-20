@@ -1,13 +1,12 @@
 from scipy.io import loadmat
 from scripts.mtl.base import MultiTaskBase
+from scripts.mtl.linear import MultiTaskLinear
 import numpy as np
 
 data = loadmat("./testdata.mat")
-data_2d = data["T_X2d"]
-labels_2d = data["T_y"][0]
+X = data["T_X2d"][0]
+y = data["T_y"][0]
 
-y = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-labels = np.array([[0, 1], [1, -1]])
 
-y = MultiTaskBase.swap_labels(y, labels, direction="to")
-print(y)
+linear = MultiTaskLinear()
+linear.fit_prior(X, y)
