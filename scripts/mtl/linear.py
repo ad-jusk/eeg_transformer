@@ -36,7 +36,6 @@ class MultiTaskLinear(MultiTaskBase):
         except ValueError as e:
             logger.error(f"Error occurred while validating dataset - {e}")
             return
-
         self.labels = np.array([np.unique(np.concatenate(y)), self.class_ids])
         for i in range(max(y.shape)):
             y[i] = MultiTaskBase.swap_labels(y[i], self.labels, direction="to")
@@ -84,8 +83,7 @@ class MultiTaskLinear(MultiTaskBase):
         return self.predict(mean_weights, X, self.labels)
 
     def predict(self, w: np.ndarray, X: np.ndarray, labels: np.ndarray):
-        a = MultiTaskBase.swap_labels(np.sign(X.T @ w), labels, "from")
-        return a
+        return MultiTaskBase.swap_labels(np.sign(X.T @ w), labels, "from")
 
     def loss(self, w, X, y):
         """

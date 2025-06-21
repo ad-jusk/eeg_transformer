@@ -9,18 +9,6 @@ import numpy as np
 def extract_basic_features_from_epochs(
     file_path: str, fmin: float = 7.0, fmax: float = 31.0, band_width: float = 2.0
 ) -> np.ndarray:
-    """
-    Extract Welch PSD features from an MNE epochs file.
-
-    Args:
-        file_path: Path to the .fif epochs file
-        fmin: Minimum frequency (Hz) for feature extraction
-        fmax: Maximum frequency (Hz)
-        band_width: Width of frequency bands (Hz)
-
-    Returns:
-        features: np.ndarray of shape (n_features, n_epochs)
-    """
     # Load epochs
     epochs = mne.read_epochs(file_path, preload=True, verbose=False)
     y = epochs.events[:, -1]
@@ -53,13 +41,15 @@ def extract_basic_features_from_epochs(
 
     # Concatenate over bands → shape: (n_epochs, n_channels * n_bands)
     features = np.concatenate(features, axis=1)
+    features = np.log10(features + 1e-12)
 
     return features.T, y
 
 
 X1, y1 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S01/PB0101T-epo.fif")
 X2, y2 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S01/PB0102T-epo.fif")
-X3, y3 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S02/PB0201T-epo.fif")
+X3, y3 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S03/PB0301T-epo.fif")
+X4, y4 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S03/PB0302T-epo.fif")
 
 data = np.empty(3, dtype=object)
 data[0] = X1
@@ -73,8 +63,6 @@ labels[2] = y3
 
 linear = MultiTaskLinear()
 linear.fit_prior(data, labels)
-
-X4, y4 = extract_basic_features_from_epochs("./preprocessed_data/BCI_IV_2b/S02/PB0201T-epo.fif")
 
 prior_predict_labels = linear.prior_predict(X4)
 prior_acc = np.mean(prior_predict_labels == y4)
