@@ -11,7 +11,7 @@ class MultiTaskLinear(MultiTaskBase):
         num_its=100,
         regularization=0.5,
         cov_flag="l2",
-        zero_mean=False,
+        zero_mean=True,
         use_pca: bool = False,
         max_it_var: float = 0.0001,
     ):
@@ -75,10 +75,22 @@ class MultiTaskLinear(MultiTaskBase):
         converged = norm < self.max_it_var * np.mean(W)
         return converged, norm
 
+    @override
+    def prior_predict(self, X: np.ndarray):
+        if len(self.labels) == 0:
+            logger.error("Cannot predict - model has not been trained")
+
+        mean_weights = np.mean(self.prior["W"], axis=1, keepdims=True)
+        return self.predict(mean_weights, X, self.labels)
+
+    def predict(self, w: np.ndarray, X: np.ndarray, labels: np.ndarray):
+        a = MultiTaskBase.swap_labels(np.sign(X.T @ w), labels, "from")
+        return a
+
     def loss(self, w, X, y):
         """
         Implements average squared loss: L = ||X.T @ w - y||^2 / len(y)
         """
-        residuals = X.conj().T @ w - y
+        residuals = X.T @ w - y
         L = np.linalg.norm(residuals, 2) ** 2 / len(y)
         return L

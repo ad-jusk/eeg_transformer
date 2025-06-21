@@ -5,7 +5,7 @@ import numpy as np
 
 class MultiTaskBase(ABC):
 
-    def __init__(self, num_its: int = 100, regularization: float = 0.5, cov_flag: str = "l2", zero_mean: bool = False):
+    def __init__(self, num_its: int = 100, regularization: float = 0.5, cov_flag: str = "l2", zero_mean: bool = True):
         """
         :param int num_its: Number of iterations of the prior computation before exiting
         :param float regularization: regularization parameter
@@ -18,20 +18,60 @@ class MultiTaskBase(ABC):
         self.zero_mean = zero_mean
         self.prior = {"regularization": 0.5}
 
+    def update_prior(self, weights: np.ndarray) -> None:
+        W = np.concatenate(weights, axis=1)
+        self.prior = self.update_gaussian_prior(W)
+
+    def update_gaussian_prior(self, W: np.ndarray) -> dict:
+        new_prior = {}
+        new_prior["W"] = W
+        new_prior["mu"] = np.mean(W, axis=1, keepdims=True)
+        temp = W - new_prior["mu"]
+
+        # Estimate raw covariance for eigenvalue check
+        raw_cov = (1 / (temp.shape[1] - 1)) * (temp @ temp.T)
+        e = np.linalg.eigvalsh(raw_cov)
+
+        if not np.any(e > 0):
+            eta = 1
+        else:
+            eta = np.abs(np.min(e[e > 0]))
+
+        # Covariance estimation
+        match self.cov_flag:
+            case "l2":
+                C = raw_cov
+            case "l2-trace":
+                C = (1 / np.trace(temp @ temp.T)) * (temp @ temp.T)
+            case _:
+                raise ValueError("Invalid covariance estimation flag")
+
+        # Regularize if rank deficient
+        if np.linalg.matrix_rank(C) < C.shape[0]:
+            C = C + eta * np.eye(C.shape[0])
+
+        new_prior["sigma"] = C
+        new_prior["eta"] = eta
+
+        if self.zero_mean:
+            new_prior["mu"] = np.zeros((W.shape[0], 1))
+
+        return new_prior
+
     @abstractmethod
     def fit_prior(self, X: np.ndarray, y: np.ndarray) -> dict:
-        prev_prior = self.prior
         its = 0
         errors = np.empty((max(X.shape), 1))
-        weights = [None] * len(X)
+        weights = np.empty_like(X)
 
         while its < self.num_its:
+            prev_prior = self.prior.copy()
 
             for i in range(max(X.shape)):
                 weights[i], errors[i] = self.fit_model(X[i], y[i], self.regularization)
 
             temp = self.prior["regularization"]
-            self.update_prior(np.array(weights))
+            self.update_prior(weights)
             self.prior["regularization"] = temp
             its += 1
 
@@ -44,16 +84,16 @@ class MultiTaskBase(ABC):
 
         return self.prior
 
-    def update_prior(self, weights: np.ndarray) -> None:
-        W = np.concatenate(weights, axis=1)
-        self.prior = self.update_gaussian_prior(W)
-
     @abstractmethod
     def fit_model(self, X: np.ndarray, y: np.ndarray, regularization: float) -> tuple[np.ndarray, float]:
         pass
 
     @abstractmethod
     def is_convergence(self, current_prior: dict, prev_prior: dict) -> tuple[bool, float]:
+        pass
+
+    @abstractmethod
+    def prior_predict(self, X: np.ndarray):
         pass
 
     @staticmethod
@@ -74,28 +114,3 @@ class MultiTaskBase(ABC):
             replace_val = labels[i, 1 - ind]
             temp[y == match_val] = replace_val
         return temp
-
-    def update_gaussian_prior(self, W: np.ndarray) -> dict:
-        new_prior = {}
-        new_prior["W"] = W
-        new_prior["mu"] = np.mean(W, axis=1, keepdims=True)
-
-        temp = W - np.tile(new_prior["mu"], (1, W.shape[1]))
-        eta = np.linalg.eigvals((1 / (temp.shape[1] - 1)) * (temp @ temp.conj().T))
-        eta = 1 if not np.any(eta > 0) else np.abs(np.min(eta[eta > 0]))
-
-        match self.cov_flag:
-            case "l2":  # Standard ML covariance update
-                C = (1 / (temp.shape[1] - 1)) * (temp @ temp.conj().T)
-            case "l2-trace":  # Trace-normalized update
-                C = (1 / np.trace(temp @ temp.conj().T)) * (temp @ temp.conj().T)
-
-        if np.linalg.matrix_rank(C) < C.shape[0]:
-            C = C + eta * np.eye(C.shape[0])
-
-        new_prior["sigma"] = C
-
-        if self.zero_mean:
-            new_prior["mu"] = np.zeros((W.shape[0], 1))
-
-        return new_prior
