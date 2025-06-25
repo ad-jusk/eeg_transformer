@@ -6,7 +6,7 @@ env/
 
 # Datasets folder
 data/
-preprocessed_data/
+epochs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -21,3 +21,6 @@ __pycache__/
 
 # Logs
 *.log
+
+# Exceptions
+!/scripts/epochs

@@ -41,7 +41,7 @@ def extract_epochs(data_path: str, save_path_root: str) -> None:
 
         filename = os.path.join(save_directory, subject, f"PA{subject[1:3]}T-epo.fif")
         epochs.save(filename)
-        logger.info(f"Preprocessed data for subject {subject[1:3]} saved as {filename}")
+        logger.info(f"Epochs for subject {subject[1:3]} saved as {filename}")
 
 
 def __extract(raw_data: mne.io.BaseRaw) -> mne.Epochs:
@@ -49,10 +49,7 @@ def __extract(raw_data: mne.io.BaseRaw) -> mne.Epochs:
     events, event_ids = mne.events_from_annotations(raw_data)  # EXTRACT EVENTS
     logger.info(f"Event ids: {event_ids}")  # THIS IS IMPORTANT BECAUSE IT PROVIDES MAPPING TO EVENT IDS
     selected_event_id = {"left_hand": 7, "right_hand": 8}  # BASED ON EVENT_IDS
-
-    # PICK ONLY EEG
-    picks = mne.pick_types(raw_data.info, meg=False, eeg=True, eog=False, stim=False, exclude="bads")
-    tmin, tmax = 1.0, 4.0
+    tmin, tmax = 0.0, 4.0
 
     epochs = mne.Epochs(
         raw_data,
@@ -60,7 +57,7 @@ def __extract(raw_data: mne.io.BaseRaw) -> mne.Epochs:
         event_id=selected_event_id,
         tmin=tmin,
         tmax=tmax,
-        picks=picks,
+        picks=["EEG-C3", "EEG-C4", "EEG-Cz", "EEG-Pz"],
         baseline=None,
         preload=True,
     )
@@ -73,7 +70,7 @@ def __create_save_directory(save_path_root: str) -> str:
     path: str = f"{save_path_root}/BCI_IV_2a"
 
     if os.path.exists(path):
-        logger.info("Removing old preprocess directory for BCI_IV_2a")
+        logger.info("Removing old epochs directory for BCI_IV_2a")
         shutil.rmtree(path)
 
     os.makedirs(path)
