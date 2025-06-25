@@ -45,65 +45,40 @@ def extract_welch_features(fif_file, fmin=7, fmax=31, n_fft=256, normalize=True)
     return X, y
 
 
-def extract_welch_features_paper(fif_file, fmin=7, fmax=31, window_type="hann"):
+def extract_welch_features_paper(fif_path):
     """
-    Extract Welch PSD features from EEG epochs using paper-specific configuration:
-    - Welch method with 50% overlap
-    - Hanning window of length N/2
-    - Frequency range: 7 - 31 Hz
-    - Binned every 2 Hz (one feature per bin per channel)
+    Extract Welch PSD features from each epoch in a .fif file.
 
-    Args:
-        fif_file (str): Path to .fif file with MNE Epochs.
-        fmin (float): Minimum frequency for PSD (default: 7 Hz).
-        fmax (float): Maximum frequency for PSD (default: 31 Hz).
-        window_type (str): Type of window to use (e.g., 'hann', 'hamming', 'boxcar').
+    Parameters:
+    - fif_path: str, path to the .fif file containing MNE Epochs
+    - picks: list of str, EEG channel names to include
 
     Returns:
-        X (np.ndarray): Feature matrix of shape (n_epochs, n_channels * n_bins), normalized.
-        y (np.ndarray): Labels of shape (n_epochs, 1)
-        bin_edges (np.ndarray): The frequency bin edges used.
+    - X: np.array of shape (n_epochs, n_channels * n_freqs)
     """
-    epochs = mne.read_epochs(fif_file, preload=True)
+    epochs = mne.read_epochs(fif_path, preload=True)
+
+    sfreq = epochs.info["sfreq"]  # sampling frequency
     data = epochs.get_data()  # shape: (n_epochs, n_channels, n_times)
-    sfreq = epochs.info["sfreq"]
+
+    freqs = np.arange(7, 32, 2)  # 7, 9, ..., 31 Hz - 13 bins
     n_epochs, n_channels, n_times = data.shape
+    nperseg = n_times // 2
+    noverlap = nperseg // 2
 
-    # Welch parameters
-    win_len = n_times // 2
-    noverlap = win_len // 2
-
-    # Frequency bins: every 2 Hz from fmin to fmax
-    bin_edges = np.arange(fmin, fmax + 1, 2)  # e.g., [7, 9, 11, ..., 31]
-    n_bins = len(bin_edges) - 1
-    X = np.zeros((n_epochs, n_channels * n_bins))
-
-    for i in range(n_epochs):
-        features = []
-        for ch in range(n_channels):
-            freqs, psd = welch(data[i, ch, :], fs=sfreq, window=window_type, nperseg=win_len, noverlap=noverlap)
-
-            # Extract PSD values within fmin-fmax
-            psd = psd[(freqs >= fmin) & (freqs <= fmax)]
-            freqs = freqs[(freqs >= fmin) & (freqs <= fmax)]
-
-            # Bin PSDs into 2 Hz ranges
-            binned = []
-            for j in range(n_bins):
-                bin_mask = (freqs >= bin_edges[j]) & (freqs < bin_edges[j + 1])
-                if np.any(bin_mask):
-                    binned.append(np.mean(psd[bin_mask]))
-                else:
-                    binned.append(0.0)
-            features.extend(binned)
-        X[i, :] = features
-
-    # Normalize features per epoch
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-
-    # Labels
+    X = []
     y = epochs.events[:, -1]
     y = np.array([0 if label == 7 else 1 for label in y]).reshape(-1, 1)
 
-    return X.T, y
+    for epoch in data:
+        features = []
+        for ch_data in epoch:
+            f, psd = welch(ch_data, fs=sfreq, window="hamming", nperseg=nperseg, noverlap=noverlap, nfft=2 * nperseg)
+            psd_vals = np.interp(freqs, f, psd)
+            features.extend(psd_vals)
+        X.append(features)
+
+    scaler = StandardScaler()
+    X = scaler.fit_transform(X)
+
+    return np.array(X).T, y

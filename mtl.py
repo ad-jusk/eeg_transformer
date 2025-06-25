@@ -1,8 +1,9 @@
 from scipy.io import loadmat
-from scripts.features_extract.welch import extract_welch_features, extract_welch_features_paper
+from scripts.features_extract.welch import extract_welch_features_paper, extract_welch_features
 from scripts.mtl.linear import MultiTaskLinear
 from eeg_logger import logger
 import numpy as np
+import os
 
 # data = loadmat("./testdata.mat")
 # all_X = data["T_X2d"][0]
@@ -23,43 +24,33 @@ import numpy as np
 # new_accuracy = np.mean(fitted_new_linear["predict"](X_test) == y_test)
 # logger.info(f"New task accuracy: {new_accuracy}")
 
-X1, y1 = extract_welch_features("./epochs/BCI_IV_2a/S01/PA01T-epo.fif")
-X2, y2 = extract_welch_features("./epochs/BCI_IV_2a/S02/PA02T-epo.fif")
-X3, y3 = extract_welch_features("./epochs/BCI_IV_2a/S03/PA03T-epo.fif")
-X4, y4 = extract_welch_features("./epochs/BCI_IV_2a/S04/PA04T-epo.fif")
-X5, y5 = extract_welch_features("./epochs/BCI_IV_2a/S05/PA05T-epo.fif")
-X6, y6 = extract_welch_features("./epochs/BCI_IV_2a/S06/PA06T-epo.fif")
-X7, y7 = extract_welch_features("./epochs/BCI_IV_2a/S07/PA07T-epo.fif")
-X8, y8 = extract_welch_features("./epochs/BCI_IV_2a/S08/PA08T-epo.fif")
-X9, y9 = extract_welch_features("./epochs/BCI_IV_2a/S09/PA09T-epo.fif")
 
-X_all = np.empty(8, dtype=object)
-X_all[0] = X1
-X_all[1] = X2
-X_all[2] = X3
-X_all[3] = X4
-X_all[4] = X5
-X_all[5] = X6
-X_all[6] = X7
-X_all[7] = X8
+def prepare_feature_matrix_bci2a(epochs_dir: str) -> np.ndarray:
+    if not os.path.exists(epochs_dir):
+        logger.error(f"{epochs_dir} does not exist")
+        return
+    subject_folders = [f for f in os.listdir(epochs_dir)]
 
-y_all = np.empty(8, dtype=object)
-y_all[0] = y1
-y_all[1] = y2
-y_all[2] = y3
-y_all[3] = y4
-y_all[4] = y5
-y_all[5] = y6
-y_all[6] = y7
-y_all[7] = y8
+    X_all = np.empty(len(subject_folders), dtype=object)
+    y_all = np.empty(len(subject_folders), dtype=object)
+    for idx, subject in enumerate(subject_folders):
+        epochs_file = os.path.join(epochs_dir, subject, f"PA{subject[1:3]}T-epo.fif")
+        X, y = extract_welch_features_paper(epochs_file)
+        X_all[idx] = X
+        y_all[idx] = y
+
+    return X_all, y_all
+
+
+X_all, y_all = prepare_feature_matrix_bci2a("./epochs/BCI_IV_2a")
 
 linear = MultiTaskLinear()
-linear.fit_prior(X_all, y_all)
+linear.fit_prior(X_all[:8], y_all[:8])
 
-prior_predict_labels = linear.prior_predict(X9)
-prior_acc = np.mean(prior_predict_labels == y9)
+prior_predict_labels = linear.prior_predict(X_all[8])
+prior_acc = np.mean(prior_predict_labels == y_all[8])
 logger.info(f"Prior accuracy for new task: {prior_acc}")
 
-fitted_new_linear = linear.fit_new_task(X9, y9)
-new_accuracy = np.mean(fitted_new_linear["predict"](X9) == y9)
+fitted_new_linear = linear.fit_new_task(X_all[8], y_all[8])
+new_accuracy = np.mean(fitted_new_linear["predict"](X_all[8]) == y_all[8])
 logger.info(f"New task accuracy: {new_accuracy}")
