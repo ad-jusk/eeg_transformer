@@ -39,8 +39,7 @@ def extract_welch_features(fif_file, fmin=7, fmax=31, n_fft=256, normalize=True)
     X = X.T
 
     # Get labels as shape (n_epochs, 1)
-    y = epochs.events[:, -1]
-    y = np.array([0 if label == 3 else 1 for label in y]).reshape(-1, 1)
+    y = epochs.events[:, -1].reshape(-1, 1)
 
     return X, y
 

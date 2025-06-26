@@ -171,26 +171,16 @@ class MultiTaskBase(ABC):
         pass
 
     @staticmethod
-    def swap_labels(y: np.ndarray, labels: np.ndarray, direction: str) -> np.ndarray:
-        """
-        Swap class labels for a given task based on a 2-row mapping.
+    def encode_labels(y):
+        """Map arbitrary binary labels to +1 and -1."""
+        classes = np.unique(y)
+        if len(classes) != 2:
+            raise ValueError("Only binary classification supported.")
+        mapping = {classes[0]: -1, classes[1]: 1}
+        return np.vectorize(mapping.get)(y), mapping
 
-        Args:
-            y (np.ndarray): Label array from one task.
-            labels (np.ndarray): 2x2 label mapping matrix. Row 0 is source labels; Row 1 is target labels.
-            direction (str): Either 'to' or 'from'. 'to' swaps from row 0 to 1, 'from' swaps from row 1 to 0.
-
-        Returns:
-            np.ndarray: Transformed label array.
-        """
-        match direction:
-            case "to":
-                ind = 0
-            case "from":
-                ind = 1
-        temp = np.zeros_like(y, dtype=np.int16)
-        for i in range(2):
-            match_val = labels[i, ind]
-            replace_val = labels[i, 1 - ind]
-            temp[y == match_val] = replace_val
-        return temp
+    @staticmethod
+    def decode_labels(y_internal, mapping):
+        """Map -1 and +1 back to original labels using inverse mapping."""
+        inv_mapping = {-1: list(mapping.keys())[0], 1: list(mapping.keys())[1]}
+        return np.vectorize(inv_mapping.get)(y_internal)

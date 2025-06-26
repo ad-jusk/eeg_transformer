@@ -15,8 +15,7 @@ class MultiTaskLinear(MultiTaskBase):
     Attributes:
         use_pca (bool): Whether to apply PCA preprocessing (currently not implemented).
         max_it_var (float): Convergence threshold for change in model weights.
-        labels (list): Internal mapping of class labels across tasks.
-        class_ids (list): Expected class IDs, assumed to be [1, -1].
+        label_mapping: dctionary used for internal label mapping
     """
 
     def __init__(
@@ -42,8 +41,7 @@ class MultiTaskLinear(MultiTaskBase):
         super().__init__(num_its, regularization, cov_flag, zero_mean)
         self.use_pca = use_pca
         self.max_it_var = max_it_var
-        self.labels = []
-        self.class_ids = [1, -1]
+        self.label_mapping = {}
 
     @override
     def fit_prior(self, X: np.ndarray, y: np.ndarray):
@@ -52,9 +50,11 @@ class MultiTaskLinear(MultiTaskBase):
         except ValueError as e:
             logger.error(f"Error occurred while validating dataset - {e}")
             return
-        self.labels = np.array([np.unique(np.concatenate(y)), self.class_ids])
-        for i in range(max(y.shape)):
-            y[i] = MultiTaskBase.swap_labels(y[i], self.labels, direction="to")
+
+        self.label_mapping = {}
+        for i in range(len(y)):
+            y[i], mapping = MultiTaskBase.encode_labels(y[i])
+            self.label_mapping[i] = mapping
 
         self.prior["mu"] = np.ones((X[0].shape[0], 1))
         self.prior["sigma"] = np.eye(X[0].shape[0])
@@ -93,9 +93,14 @@ class MultiTaskLinear(MultiTaskBase):
 
         out = {"lambda": self.regularization}
         X_original = X
-        y_train = MultiTaskBase.swap_labels(y, self.labels, "to")
-        out["w"], out["loss"] = self._fit_model(X, y_train, out["lambda"])
-        out["predict"] = lambda X: self.predict(out["w"], X, self.labels)
+        y_internal, mapping = MultiTaskBase.encode_labels(y)
+        out["w"], out["loss"] = self._fit_model(X, y_internal, out["lambda"])
+
+        def task_predict(X_test):
+            raw_preds = np.sign(X_test.T @ out["w"])
+            return MultiTaskBase.decode_labels(raw_preds, mapping)
+
+        out["predict"] = task_predict
         out["train_acc"] = np.mean(y == out["predict"](X_original))
         return out
 
@@ -109,14 +114,16 @@ class MultiTaskLinear(MultiTaskBase):
 
     @override
     def prior_predict(self, X: np.ndarray):
-        if len(self.labels) == 0:
-            logger.error("Cannot predict - model has not been trained")
 
         mean_weights = np.mean(self.prior["W"], axis=1, keepdims=True)
-        return self.predict(mean_weights, X, self.labels)
+        raw_preds = np.sign(X.T @ mean_weights)
 
-    def predict(self, w: np.ndarray, X: np.ndarray, labels: np.ndarray):
-        return MultiTaskBase.swap_labels(np.sign(X.T @ w), labels, "from")
+        # Choose any available label mapping
+        if self.label_mapping:
+            mapping = list(self.label_mapping.values())[0]
+            return MultiTaskBase.decode_labels(raw_preds, mapping)
+        else:
+            return raw_preds
 
     def loss(self, w, X, y) -> float:
         """

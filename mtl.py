@@ -1,6 +1,7 @@
 from scipy.io import loadmat
 from scripts.features_extract.welch import extract_welch_features_paper, extract_welch_features
 from scripts.mtl.linear import MultiTaskLinear
+from sklearn.model_selection import train_test_split
 from eeg_logger import logger
 import numpy as np
 import os
@@ -25,7 +26,7 @@ import os
 # logger.info(f"New task accuracy: {new_accuracy}")
 
 
-def prepare_feature_matrix_physionet(epochs_dir: str) -> np.ndarray:
+def prepare_feature_matrix_physionet(epochs_dir: str = "./epochs/Physionet") -> np.ndarray:
     if not os.path.exists(epochs_dir):
         logger.error(f"{epochs_dir} does not exist")
         return
@@ -41,7 +42,7 @@ def prepare_feature_matrix_physionet(epochs_dir: str) -> np.ndarray:
     return X_all, y_all
 
 
-def prepare_feature_matrix_bci2a(epochs_dir: str) -> np.ndarray:
+def prepare_feature_matrix_bci2a(epochs_dir: str = "./epochs/BCI_IV_2a") -> np.ndarray:
     if not os.path.exists(epochs_dir):
         logger.error(f"{epochs_dir} does not exist")
         return
@@ -57,31 +58,49 @@ def prepare_feature_matrix_bci2a(epochs_dir: str) -> np.ndarray:
     return X_all, y_all
 
 
-X_all, y_all = prepare_feature_matrix_bci2a("./epochs/BCI_IV_2a")
+def prepare_feature_matrix_bci2b(epochs_dir: str = "./epochs/BCI_IV_2b") -> np.ndarray:
+    if not os.path.exists(epochs_dir):
+        logger.error(f"{epochs_dir} does not exist")
+        return
+    subject_folders = [f for f in os.listdir(epochs_dir)]
 
-X_train = np.empty(5, dtype=object)
-X_train[0] = X_all[0][:, :24]
-X_train[1] = X_all[0][:, 24:48]
-X_train[2] = X_all[0][:, 48:72]
-X_train[3] = X_all[0][:, 72:96]
-X_train[4] = X_all[0][:, 96:120]
+    X_all = np.empty(len(subject_folders) * 3, dtype=object)
+    y_all = np.empty(len(subject_folders) * 3, dtype=object)
 
-y_train = np.empty(5, dtype=object)
-y_train[0] = y_all[0][:24]
-y_train[1] = y_all[0][24:48]
-y_train[2] = y_all[0][48:72]
-y_train[3] = y_all[0][72:96]
-y_train[4] = y_all[0][96:120]
+    for idx, subject in enumerate(subject_folders):
+        subject_id = subject[1:]
 
-X_test, y_test = X_all[0][:, 120:], y_all[0][120:]
+        epochs_file1 = os.path.join(epochs_dir, subject, f"PB{subject_id}01T-epo.fif")
+        epochs_file2 = os.path.join(epochs_dir, subject, f"PB{subject_id}02T-epo.fif")
+        epochs_file3 = os.path.join(epochs_dir, subject, f"PB{subject_id}03T-epo.fif")
 
-linear = MultiTaskLinear()
+        X1, y1 = extract_welch_features_paper(epochs_file1)
+        X2, y2 = extract_welch_features_paper(epochs_file2)
+        X3, y3 = extract_welch_features_paper(epochs_file3)
+
+        base_idx = idx * 3
+        X_all[base_idx] = X1
+        X_all[base_idx + 1] = X2
+        X_all[base_idx + 2] = X3
+
+        y_all[base_idx] = y1
+        y_all[base_idx + 1] = y2
+        y_all[base_idx + 2] = y3
+
+    return X_all, y_all
+
+
+X_all, y_all = prepare_feature_matrix_bci2b()
+X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=1, random_state=42, shuffle=True)
+print(X_test.shape)
+
+linear = MultiTaskLinear(num_its=200)
 linear.fit_prior(X_train, y_train)
 
-prior_predict_labels = linear.prior_predict(X_test)
-prior_acc = np.mean(prior_predict_labels == y_test)
+prior_predict_labels = linear.prior_predict(X_test[0])
+prior_acc = np.mean(prior_predict_labels == y_test[0])
 logger.info(f"Prior accuracy for new task: {prior_acc}")
 
-fitted_new_linear = linear.fit_new_task(X_test, y_test)
-new_accuracy = np.mean(fitted_new_linear["predict"](X_test) == y_test)
+fitted_new_linear = linear.fit_new_task(X_test[0], y_test[0])
+new_accuracy = np.mean(fitted_new_linear["predict"](X_test[0]) == y_test[0])
 logger.info(f"New task accuracy: {new_accuracy}")
