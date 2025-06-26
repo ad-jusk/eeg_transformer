@@ -80,8 +80,30 @@ def __extract(raw_data: mne.io.BaseRaw) -> tuple[mne.Epochs, mne.Epochs]:
     logger.info(f"Event ids: {event_ids}")  # THIS IS IMPORTANT BECAUSE IT PROVIDES MAPPING TO EVENT IDS
     selected_event_id = {"left_hand": 2, "right_hand": 3}  # BASED ON EVENT_IDS
 
-    # PICK ONLY EEG
-    picks = mne.pick_types(raw_data.info, meg=False, eeg=True, eog=False, stim=False, exclude="bads")
+    # PICK ONLY CHANNELS FOR MOTOR IMAGERY
+    picks = picks = [
+        "Fc5.",
+        "Fc3.",
+        "Fc1.",
+        "Fcz.",
+        "Fc2.",
+        "Fc4.",
+        "Fc6.",
+        "C5..",
+        "C3..",
+        "C1..",
+        "Cz..",
+        "C2..",
+        "C4..",
+        "C6..",
+        "Cp5.",
+        "Cp3.",
+        "Cp1.",
+        "Cpz.",
+        "Cp2.",
+        "Cp4.",
+        "Cp6.",
+    ]
     tmin_3s, tmax_3s = 2.0, 5.0
     tmin_6s, tmax_6s = 1.0, 7.0
 

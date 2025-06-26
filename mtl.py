@@ -25,6 +25,22 @@ import os
 # logger.info(f"New task accuracy: {new_accuracy}")
 
 
+def prepare_feature_matrix_physionet(epochs_dir: str) -> np.ndarray:
+    if not os.path.exists(epochs_dir):
+        logger.error(f"{epochs_dir} does not exist")
+        return
+    subject_folders = [f for f in os.listdir(epochs_dir)]
+
+    X_all = np.empty(len(subject_folders), dtype=object)
+    y_all = np.empty(len(subject_folders), dtype=object)
+    for idx, subject in enumerate(subject_folders):
+        epochs_file = os.path.join(epochs_dir, subject, f"PA{subject[1:]}-3s-epo.fif")
+        X, y = extract_welch_features_paper(epochs_file)
+        X_all[idx] = X
+        y_all[idx] = y
+    return X_all, y_all
+
+
 def prepare_feature_matrix_bci2a(epochs_dir: str) -> np.ndarray:
     if not os.path.exists(epochs_dir):
         logger.error(f"{epochs_dir} does not exist")
@@ -38,19 +54,34 @@ def prepare_feature_matrix_bci2a(epochs_dir: str) -> np.ndarray:
         X, y = extract_welch_features_paper(epochs_file)
         X_all[idx] = X
         y_all[idx] = y
-
     return X_all, y_all
 
 
 X_all, y_all = prepare_feature_matrix_bci2a("./epochs/BCI_IV_2a")
 
-linear = MultiTaskLinear()
-linear.fit_prior(X_all[:8], y_all[:8])
+X_train = np.empty(5, dtype=object)
+X_train[0] = X_all[0][:, :24]
+X_train[1] = X_all[0][:, 24:48]
+X_train[2] = X_all[0][:, 48:72]
+X_train[3] = X_all[0][:, 72:96]
+X_train[4] = X_all[0][:, 96:120]
 
-prior_predict_labels = linear.prior_predict(X_all[8])
-prior_acc = np.mean(prior_predict_labels == y_all[8])
+y_train = np.empty(5, dtype=object)
+y_train[0] = y_all[0][:24]
+y_train[1] = y_all[0][24:48]
+y_train[2] = y_all[0][48:72]
+y_train[3] = y_all[0][72:96]
+y_train[4] = y_all[0][96:120]
+
+X_test, y_test = X_all[0][:, 120:], y_all[0][120:]
+
+linear = MultiTaskLinear()
+linear.fit_prior(X_train, y_train)
+
+prior_predict_labels = linear.prior_predict(X_test)
+prior_acc = np.mean(prior_predict_labels == y_test)
 logger.info(f"Prior accuracy for new task: {prior_acc}")
 
-fitted_new_linear = linear.fit_new_task(X_all[8], y_all[8])
-new_accuracy = np.mean(fitted_new_linear["predict"](X_all[8]) == y_all[8])
+fitted_new_linear = linear.fit_new_task(X_test, y_test)
+new_accuracy = np.mean(fitted_new_linear["predict"](X_test) == y_test)
 logger.info(f"New task accuracy: {new_accuracy}")
