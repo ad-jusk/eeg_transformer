@@ -1,106 +1,102 @@
-from scipy.io import loadmat
-from scripts.features_extract.welch import extract_welch_features_paper, extract_welch_features
-from scripts.mtl.linear import MultiTaskLinear
-from sklearn.model_selection import train_test_split
-from eeg_logger import logger
+import warnings
+
 import numpy as np
-import os
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from mne.decoding import CSP, PSDEstimator
+from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.svm import SVC
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.pipeline import make_pipeline
 
-# data = loadmat("./testdata.mat")
-# all_X = data["T_X2d"][0]
-# all_y = data["T_y"][0]
+import moabb
+from moabb.datasets import BNCI2014_001
+from moabb.evaluations import CrossSessionEvaluation
+from moabb.paradigms import LeftRightImagery
 
-# X_train, X_test = all_X[:4], all_X[4]
-# y_train, y_test = all_y[:4], all_y[4]
+from scripts.mtl.linear import MultiTaskLinear
 
-# linear = MultiTaskLinear()
-
-# linear.fit_prior(X_train, y_train)
-
-# prior_predict_labels = linear.prior_predict(X_test)
-# prior_acc = np.mean(prior_predict_labels == y_test)
-# logger.info(f"Prior accuracy for new task: {prior_acc}")
-
-# fitted_new_linear = linear.fit_new_task(X_test, y_test)
-# new_accuracy = np.mean(fitted_new_linear["predict"](X_test) == y_test)
-# logger.info(f"New task accuracy: {new_accuracy}")
-
-
-def prepare_feature_matrix_physionet(epochs_dir: str = "./epochs/Physionet") -> np.ndarray:
-    if not os.path.exists(epochs_dir):
-        logger.error(f"{epochs_dir} does not exist")
-        return
-    subject_folders = [f for f in os.listdir(epochs_dir)]
-
-    X_all = np.empty(len(subject_folders), dtype=object)
-    y_all = np.empty(len(subject_folders), dtype=object)
-    for idx, subject in enumerate(subject_folders):
-        epochs_file = os.path.join(epochs_dir, subject, f"PA{subject[1:]}-3s-epo.fif")
-        X, y = extract_welch_features_paper(epochs_file)
-        X_all[idx] = X
-        y_all[idx] = y
-    return X_all, y_all
+moabb.set_log_level("info")
+warnings.filterwarnings("ignore")
 
 
-def prepare_feature_matrix_bci2a(epochs_dir: str = "./epochs/BCI_IV_2a") -> np.ndarray:
-    if not os.path.exists(epochs_dir):
-        logger.error(f"{epochs_dir} does not exist")
-        return
-    subject_folders = [f for f in os.listdir(epochs_dir)]
+class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        num_its=100,
+        regularization=0.5,
+        cov_flag="l2",
+        zero_mean=True,
+        use_pca=False,
+        max_it_var=0.0001,
+    ):
+        self.num_its = num_its
+        self.regularization = regularization
+        self.cov_flag = cov_flag
+        self.zero_mean = zero_mean
+        self.use_pca = use_pca
+        self.max_it_var = max_it_var
+        self.base_model = MultiTaskLinear(
+            num_its=num_its,
+            regularization=regularization,
+            cov_flag=cov_flag,
+            zero_mean=zero_mean,
+            use_pca=use_pca,
+            max_it_var=max_it_var,
+        )
+        self.task_model = None
 
-    X_all = np.empty(len(subject_folders), dtype=object)
-    y_all = np.empty(len(subject_folders), dtype=object)
-    for idx, subject in enumerate(subject_folders):
-        epochs_file = os.path.join(epochs_dir, subject, f"PA{subject[1:3]}T-epo.fif")
-        X, y = extract_welch_features_paper(epochs_file)
-        X_all[idx] = X
-        y_all[idx] = y
-    return X_all, y_all
+    def fit_sessions(self, X_sessions, y_sessions):
+        """
+        This method fits the prior using multiple sessions.
+        X_sessions: ndarray of shape (n_sessions,) where each element is (n_features, n_epochs)
+        y_sessions: list or array of shape (n_sessions,) where each element is (n_epochs,)
+        """
+        y_sessions = np.array(y_sessions, dtype=object)
+        self.base_model.fit_prior(X_sessions, y_sessions)
+        return self
+
+    def fit(self, X, y):
+        """
+        Standard scikit-learn `fit`, used to train on a single task after prior.
+        Expects X shape: (n_samples, n_features) => Transposed internally to (n_features, n_samples)
+        """
+        X = X.T  # Convert to (n_features, n_samples)
+        y = np.array(y).reshape(-1, 1)
+        self.task_model = self.base_model.fit_new_task(X, y)
+        return self
+
+    def predict(self, X):
+        X = X.T  # Convert to (n_features, n_samples)
+        if self.task_model:
+            return self.task_model["predict"](X).flatten()
+        else:
+            return self.base_model.prior_predict(X).flatten()
+
+    def score(self, X, y):
+        from sklearn.metrics import accuracy_score
+
+        return accuracy_score(y, self.predict(X))
 
 
-def prepare_feature_matrix_bci2b(epochs_dir: str = "./epochs/BCI_IV_2b") -> np.ndarray:
-    if not os.path.exists(epochs_dir):
-        logger.error(f"{epochs_dir} does not exist")
-        return
-    subject_folders = [f for f in os.listdir(epochs_dir)]
+dataset = BNCI2014_001()
+dataset.subject_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+paradigm = LeftRightImagery()
+X_prior, y_prior, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list)
+sessions = metadata.session.unique()
+X_sessions = []
+y_sessions = []
 
-    X_all = np.empty(len(subject_folders) * 3, dtype=object)
-    y_all = np.empty(len(subject_folders) * 3, dtype=object)
+for session in sessions:
+    session_mask = metadata.session == session
+    X_sess = X_prior[session_mask].T  # shape (n_features, n_epochs)
+    y_sess = y_prior[session_mask].reshape(-1, 1)
+    X_sessions.append(X_sess)
+    y_sessions.append(y_sess)
 
-    for idx, subject in enumerate(subject_folders):
-        subject_id = subject[1:]
-
-        epochs_file1 = os.path.join(epochs_dir, subject, f"PB{subject_id}01T-epo.fif")
-        epochs_file2 = os.path.join(epochs_dir, subject, f"PB{subject_id}02T-epo.fif")
-        epochs_file3 = os.path.join(epochs_dir, subject, f"PB{subject_id}03T-epo.fif")
-
-        X1, y1 = extract_welch_features_paper(epochs_file1)
-        X2, y2 = extract_welch_features_paper(epochs_file2)
-        X3, y3 = extract_welch_features_paper(epochs_file3)
-
-        base_idx = idx * 3
-        X_all[base_idx] = X1
-        X_all[base_idx + 1] = X2
-        X_all[base_idx + 2] = X3
-
-        y_all[base_idx] = y1
-        y_all[base_idx + 1] = y2
-        y_all[base_idx + 2] = y3
-
-    return X_all, y_all
-
-
-X_all, y_all = prepare_feature_matrix_bci2b()
-X_train, X_test, y_train, y_test = train_test_split(X_all, y_all, test_size=1, random_state=42, shuffle=True)
-print(X_test.shape)
-
-linear = MultiTaskLinear(num_its=200)
-linear.fit_prior(X_train, y_train)
-
-prior_predict_labels = linear.prior_predict(X_test[0])
-prior_acc = np.mean(prior_predict_labels == y_test[0])
-logger.info(f"Prior accuracy for new task: {prior_acc}")
-
-fitted_new_linear = linear.fit_new_task(X_test[0], y_test[0])
-new_accuracy = np.mean(fitted_new_linear["predict"](X_test[0]) == y_test[0])
-logger.info(f"New task accuracy: {new_accuracy}")
+clf = MultiTaskLinearClassifier()
+clf.fit_sessions(np.array(X_sessions, dtype=object), np.array(y_sessions, dtype=object))
+eval = CrossSessionEvaluation(paradigm=paradigm, datasets=[dataset], overwrite=True)
+results = eval.process(pipelines={"mtl": clf})
