@@ -17,7 +17,7 @@ class MultiTaskLinear:
         self.regularization = regularization
         self.cov_flag = cov_flag
         self.zero_mean = zero_mean
-        self.prior = {"regularization": 0.5}
+        self.prior = {"regularization": regularization}
         self.use_pca = use_pca
         self.max_it_var = max_it_var
         self.label_mapping = {}

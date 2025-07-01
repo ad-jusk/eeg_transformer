@@ -6,16 +6,18 @@ import pandas as pd
 import seaborn as sns
 from mne.decoding import CSP, PSDEstimator
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.svm import SVC
-from sklearn.preprocessing import FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer, LabelEncoder
 from sklearn.pipeline import make_pipeline
-
+from mne.filter import notch_filter
 import moabb
 from moabb.datasets import BNCI2014_001
 from moabb.evaluations import CrossSessionEvaluation
 from moabb.paradigms import LeftRightImagery
 
+from scripts.features_extract.welch import extract_welch_features
 from scripts.mtl.linear import MultiTaskLinear
 
 moabb.set_log_level("info")
@@ -32,12 +34,6 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
         use_pca=False,
         max_it_var=0.0001,
     ):
-        self.num_its = num_its
-        self.regularization = regularization
-        self.cov_flag = cov_flag
-        self.zero_mean = zero_mean
-        self.use_pca = use_pca
-        self.max_it_var = max_it_var
         self.base_model = MultiTaskLinear(
             num_its=num_its,
             regularization=regularization,
@@ -49,54 +45,69 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
         self.task_model = None
 
     def fit_sessions(self, X_sessions, y_sessions):
-        """
-        This method fits the prior using multiple sessions.
-        X_sessions: ndarray of shape (n_sessions,) where each element is (n_features, n_epochs)
-        y_sessions: list or array of shape (n_sessions,) where each element is (n_epochs,)
-        """
-        y_sessions = np.array(y_sessions, dtype=object)
         self.base_model.fit_prior(X_sessions, y_sessions)
         return self
 
     def fit(self, X, y):
-        """
-        Standard scikit-learn `fit`, used to train on a single task after prior.
-        Expects X shape: (n_samples, n_features) => Transposed internally to (n_features, n_samples)
-        """
-        X = X.T  # Convert to (n_features, n_samples)
-        y = np.array(y).reshape(-1, 1)
         self.task_model = self.base_model.fit_new_task(X, y)
         return self
 
     def predict(self, X):
-        X = X.T  # Convert to (n_features, n_samples)
         if self.task_model:
-            return self.task_model["predict"](X).flatten()
+            return self.task_model["predict"](X)
         else:
-            return self.base_model.prior_predict(X).flatten()
+            return self.base_model.prior_predict(X)
 
     def score(self, X, y):
         from sklearn.metrics import accuracy_score
 
-        return accuracy_score(y, self.predict(X))
+        y_p = self.predict(X)
+        return accuracy_score(y, y_p)
 
 
 dataset = BNCI2014_001()
 dataset.subject_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-paradigm = LeftRightImagery()
-X_prior, y_prior, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list)
-sessions = metadata.session.unique()
-X_sessions = []
-y_sessions = []
+paradigm = LeftRightImagery(channels=["Cz", "C3", "C4", "CP1", "CP2", "Pz", "P1", "CP3"])
 
-for session in sessions:
-    session_mask = metadata.session == session
-    X_sess = X_prior[session_mask].T  # shape (n_features, n_epochs)
-    y_sess = y_prior[session_mask].reshape(-1, 1)
-    X_sessions.append(X_sess)
-    y_sessions.append(y_sess)
+X_all, y_all, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list, return_epochs=False)
+subjects = metadata["subject"].unique()
+sessions = metadata["session"].unique()
 
-clf = MultiTaskLinearClassifier()
-clf.fit_sessions(np.array(X_sessions, dtype=object), np.array(y_sessions, dtype=object))
-eval = CrossSessionEvaluation(paradigm=paradigm, datasets=[dataset], overwrite=True)
-results = eval.process(pipelines={"mtl": clf})
+X_all = notch_filter(X_all, 250, freqs=50)
+
+X_train = np.empty(len(subjects), dtype=object)
+X_test = np.empty(len(subjects), dtype=object)
+y_train = np.empty(len(subjects), dtype=object)
+y_test = np.empty(len(subjects), dtype=object)
+label_map = {"left_hand": -1, "right_hand": 1}
+
+for idx, subject in enumerate(subjects):
+
+    train_mask = (metadata["subject"] == subject) & (metadata["session"] == "0train")
+    test_mask = (metadata["subject"] == subject) & (metadata["session"] == "1test")
+
+    X_sess_train = X_all[train_mask]
+    y_sess_train = y_all[train_mask]
+    X_sess_test = X_all[test_mask]
+    y_sess_test = y_all[test_mask]
+
+    X_train_feat = extract_welch_features(X_sess_train)
+    X_test_feat = extract_welch_features(X_sess_test)
+    y_sess_train = np.array([label_map[label] for label in y_sess_train])
+    y_sess_test = np.array([label_map[label] for label in y_sess_test])
+
+    X_train[idx] = X_train_feat.T
+    X_test[idx] = X_test_feat.T
+    y_train[idx] = y_sess_train.reshape(-1, 1)
+    y_test[idx] = y_sess_test.reshape(-1, 1)
+
+clf = MultiTaskLinearClassifier(regularization=0.5, zero_mean=False)
+clf.fit_sessions(X_train, y_train)
+
+accuracies = []
+for idx, subject in enumerate(subjects):
+    clf.fit(X_train[idx], y_train[idx])
+    acc = clf.score(X_test[idx], y_test[idx])
+    accuracies.append(acc)
+    print(f"Accuracy for subject {idx}: {acc:.2f}")
+print(f"Mean accuracy across subjects: {np.mean(accuracies):.2f}")
