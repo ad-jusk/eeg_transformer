@@ -17,16 +17,16 @@ class MultiTaskLinear:
         self.regularization = regularization
         self.cov_flag = cov_flag
         self.zero_mean = zero_mean
-        self.prior = {"regularization": regularization}
         self.use_pca = use_pca
         self.max_it_var = max_it_var
+        self.prior = {}
         self.label_mapping = {}
 
     def fit_prior(self, X: np.ndarray, y: np.ndarray):
         try:
             self.__validate_dataset(X, y)
         except ValueError as e:
-            logger.error(f"Error occurred while validating dataset - {e} {X.shape} {y.shape}")
+            logger.error(f"Error occurred while validating dataset - {e}")
             return
 
         self.label_mapping = {}
@@ -34,9 +34,7 @@ class MultiTaskLinear:
             y[i], mapping = self.__encode_labels(y[i])
             self.label_mapping[i] = mapping
 
-        self.prior["mu"] = np.ones((X[0].shape[0], 1))
-        self.prior["sigma"] = np.eye(X[0].shape[0])
-        self.prior["W"] = np.zeros((X[0].shape[0], max(X.shape)))
+        self.__init_prior(X)
 
         its = 0
         errors = np.empty((max(X.shape), 1))
@@ -46,7 +44,7 @@ class MultiTaskLinear:
             prev_prior = self.prior
 
             for i in range(max(X.shape)):
-                weights[i], errors[i] = self._fit_model(X[i], y[i], self.regularization)
+                weights[i], errors[i] = self.__fit_model(X[i], y[i], self.regularization)
 
             temp = self.prior["regularization"]
             self.__update_prior(weights)
@@ -61,6 +59,40 @@ class MultiTaskLinear:
                 logger.info(f"Iteration {its}, error = {num}")
 
         return self.prior
+
+    def fit_new_task(self, X: np.ndarray, y: np.ndarray) -> dict:
+        if X.shape[0] != max(self.prior["mu"].shape):
+            logger.error("Feature dimensionality of the data does not match this model")
+            return {}
+
+        out = {"lambda": self.regularization}
+        X_original = X
+        y_internal, mapping = self.__encode_labels(y)
+        out["w"], out["loss"] = self.__fit_model(X, y_internal, out["lambda"])
+
+        def task_predict(X_test):
+            raw_preds = np.sign(X_test.T @ out["w"])
+            return self.__decode_labels(raw_preds, mapping)
+
+        out["predict"] = task_predict
+        out["train_acc"] = np.mean(y == out["predict"](X_original))
+        return out
+
+    def prior_predict(self, X: np.ndarray):
+        mean_weights = np.mean(self.prior["W"], axis=1, keepdims=True)
+        raw_preds = np.sign(X.T @ mean_weights)
+
+        if self.label_mapping:
+            mapping = list(self.label_mapping.values())[0]
+            return self.__decode_labels(raw_preds, mapping)
+        else:
+            return raw_preds
+
+    def __init_prior(self, X: np.ndarray):
+        self.prior["regularization"] = self.regularization
+        self.prior["mu"] = np.ones((X[0].shape[0], 1))
+        self.prior["sigma"] = np.eye(X[0].shape[0])
+        self.prior["W"] = np.zeros((X[0].shape[0], max(X.shape)))
 
     def __update_prior(self, weights: np.ndarray) -> None:
         W = np.concatenate(weights, axis=1)
@@ -101,38 +133,22 @@ class MultiTaskLinear:
 
     def __validate_dataset(self, X: np.ndarray, y: np.ndarray):
         if max(X.shape) != max(y.shape):
-            raise ValueError("Unequal data and label arrays")
+            raise ValueError(f"Unequal data and label arrays: data - {X.shape}, labels - {y.shape}")
         if max(X.shape) <= 1:
             raise ValueError("Only one dataset provided - cancelling")
         for i in range(max(X.shape)):
             if X[i].shape[1] != max(y[i].shape):
-                raise ValueError("Number of datapoints and labels differ")
+                raise ValueError(
+                    f"Number of datapoints and labels differ: : data - {X[i].shape}, labels - {y[i].shape}"
+                )
 
-    def _fit_model(self, X: np.ndarray, y: np.ndarray, regularization: float) -> tuple[np.ndarray, float]:
+    def __fit_model(self, X: np.ndarray, y: np.ndarray, regularization: float) -> tuple[np.ndarray, float]:
         Ax = self.prior["sigma"] @ X
         A = (1 / regularization) * (Ax @ X.T) + np.eye(X.shape[0])
         b = (1 / regularization) * (Ax @ y) + self.prior["mu"]
         w = np.linalg.solve(A, b)
-        loss = self.loss(w, X, y)
+        loss = self.__loss(w, X, y)
         return w, loss
-
-    def fit_new_task(self, X: np.ndarray, y: np.ndarray) -> dict:
-        if X.shape[0] != max(self.prior["mu"].shape):
-            logger.error("Feature dimensionality of the data does not match this model")
-            return {}
-
-        out = {"lambda": self.regularization}
-        X_original = X
-        y_internal, mapping = self.__encode_labels(y)
-        out["w"], out["loss"] = self._fit_model(X, y_internal, out["lambda"])
-
-        def task_predict(X_test):
-            raw_preds = np.sign(X_test.T @ out["w"])
-            return self.__decode_labels(raw_preds, mapping)
-
-        out["predict"] = task_predict
-        out["train_acc"] = np.mean(y == out["predict"](X_original))
-        return out
 
     def __is_convergence(self, current_prior: dict, prev_prior: dict) -> tuple[bool, float]:
         W = current_prior["W"]
@@ -141,18 +157,7 @@ class MultiTaskLinear:
         converged = norm < self.max_it_var * np.mean(W)
         return converged, norm
 
-    def prior_predict(self, X: np.ndarray):
-
-        mean_weights = np.mean(self.prior["W"], axis=1, keepdims=True)
-        raw_preds = np.sign(X.T @ mean_weights)
-
-        if self.label_mapping:
-            mapping = list(self.label_mapping.values())[0]
-            return self.__decode_labels(raw_preds, mapping)
-        else:
-            return raw_preds
-
-    def loss(self, w, X, y) -> float:
+    def __loss(self, w, X, y) -> float:
         """
         Compute average squared loss for linear predictions.
         """
