@@ -1,20 +1,10 @@
 import warnings
 
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
-from mne.decoding import CSP, PSDEstimator
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.svm import SVC
-from sklearn.preprocessing import FunctionTransformer, LabelEncoder
-from sklearn.pipeline import make_pipeline
 from mne.filter import notch_filter
 import moabb
 from moabb.datasets import BNCI2014_001
-from moabb.evaluations import CrossSessionEvaluation
 from moabb.paradigms import LeftRightImagery
 
 from scripts.features_extract.welch import extract_welch_features
@@ -67,7 +57,7 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
 
 dataset = BNCI2014_001()
 dataset.subject_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-paradigm = LeftRightImagery(channels=["Cz", "C3", "C4", "CP1", "CP2", "Pz", "P1", "CP3"])
+paradigm = LeftRightImagery(channels=["C1", "C2", "C3", "C4", "Cz", "CP1", "CP2", "FC1", "FC2", "FC3", "FC4"])
 
 X_all, y_all, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list, return_epochs=False)
 subjects = metadata["subject"].unique()
