@@ -36,6 +36,7 @@ class FileFormatter(logging.Formatter):
 
 logger = logging.getLogger("eeg_logger")
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(StreamFormatter())
