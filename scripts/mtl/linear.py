@@ -11,7 +11,6 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
         regularization=0.5,
         cov_flag="l2",
         zero_mean=True,
-        use_pca=False,
         max_it_var=0.0001,
     ):
         self.base_model = MultiTaskLinear(
@@ -19,7 +18,6 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
             regularization=regularization,
             cov_flag=cov_flag,
             zero_mean=zero_mean,
-            use_pca=use_pca,
             max_it_var=max_it_var,
         )
         self.task_model = None
@@ -53,14 +51,12 @@ class MultiTaskLinear:
         regularization: float = 0.5,
         cov_flag: str = "l2",
         zero_mean: bool = True,
-        use_pca: bool = False,
         max_it_var: float = 0.0001,
     ):
         self.num_its = num_its
         self.regularization = regularization
         self.cov_flag = cov_flag
         self.zero_mean = zero_mean
-        self.use_pca = use_pca
         self.max_it_var = max_it_var
         self.prior = {}
         self.label_mapping = {}

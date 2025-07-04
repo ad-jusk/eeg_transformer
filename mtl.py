@@ -7,13 +7,15 @@ from moabb.paradigms import LeftRightImagery
 
 from scripts.features_extract.welch import extract_welch_features
 from scripts.mtl.linear import MultiTaskLinearClassifier
+from eeg_logger import logger
 
 moabb.set_log_level("info")
 warnings.filterwarnings("ignore")
 
 dataset = BNCI2014_001()
 dataset.subject_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-paradigm = LeftRightImagery(channels=["C1", "C2", "C3", "C4", "Cz", "CP1", "CP2", "FC1", "FC2", "FC3", "FC4"])
+# channels=["C1", "C2", "C3", "C4", "Cz", "CP1", "CP2", "FC1", "FC2", "FC3", "FC4"]
+paradigm = LeftRightImagery(channels=None)
 
 X_all, y_all, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list, return_epochs=False)
 subjects = metadata["subject"].unique()
@@ -45,7 +47,7 @@ for idx, subject in enumerate(subjects):
     y_train[idx] = y_sess_train.reshape(-1, 1)
     y_test[idx] = y_sess_test.reshape(-1, 1)
 
-clf = MultiTaskLinearClassifier(regularization=0.5, zero_mean=False, cov_flag="l2")
+clf = MultiTaskLinearClassifier(regularization=0.2, zero_mean=False, cov_flag="l2")
 clf.fit_sessions(X_train, y_train)
 
 accuracies = []
@@ -53,5 +55,5 @@ for idx, subject in enumerate(subjects):
     clf.fit(X_train[idx], y_train[idx])
     acc = clf.score(X_test[idx], y_test[idx])
     accuracies.append(acc)
-    print(f"Accuracy for subject {idx}: {acc:.2f}")
-print(f"Mean accuracy across subjects: {np.mean(accuracies):.2f}")
+    logger.info(f"Accuracy for subject {idx}: {acc:.2f}")
+logger.info(f"Mean accuracy across subjects: {np.mean(accuracies):.2f}")
