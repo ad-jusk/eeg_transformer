@@ -1,5 +1,48 @@
 import numpy as np
+from sklearn.base import BaseEstimator, ClassifierMixin
+from scipy.linalg import sqrtm
 from eeg_logger import logger
+
+
+class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(
+        self,
+        num_its=100,
+        regularization=0.5,
+        cov_flag="l2",
+        zero_mean=True,
+        use_pca=False,
+        max_it_var=0.0001,
+    ):
+        self.base_model = MultiTaskLinear(
+            num_its=num_its,
+            regularization=regularization,
+            cov_flag=cov_flag,
+            zero_mean=zero_mean,
+            use_pca=use_pca,
+            max_it_var=max_it_var,
+        )
+        self.task_model = None
+
+    def fit_sessions(self, X_sessions, y_sessions):
+        self.base_model.fit_prior(X_sessions, y_sessions)
+        return self
+
+    def fit(self, X, y):
+        self.task_model = self.base_model.fit_new_task(X, y)
+        return self
+
+    def predict(self, X):
+        if self.task_model:
+            return self.task_model["predict"](X)
+        else:
+            return self.base_model.prior_predict(X)
+
+    def score(self, X, y):
+        from sklearn.metrics import accuracy_score
+
+        y_p = self.predict(X)
+        return accuracy_score(y, y_p)
 
 
 class MultiTaskLinear:
@@ -113,6 +156,10 @@ class MultiTaskLinear:
             eta = np.abs(np.min(e[e > 0]))
 
         match self.cov_flag:
+            case "l1":
+                eta = 1e-4
+                D = sqrtm(temp @ temp.T + np.eye(temp.shape[0]) * eta)
+                C = D / np.trace(D)
             case "l2":
                 C = raw_cov
             case "l2-trace":

@@ -1,59 +1,15 @@
 import warnings
 
 import numpy as np
-from sklearn.base import BaseEstimator, ClassifierMixin
-from mne.filter import notch_filter
 import moabb
 from moabb.datasets import BNCI2014_001
 from moabb.paradigms import LeftRightImagery
 
 from scripts.features_extract.welch import extract_welch_features
-from scripts.mtl.linear import MultiTaskLinear
+from scripts.mtl.linear import MultiTaskLinearClassifier
 
 moabb.set_log_level("info")
 warnings.filterwarnings("ignore")
-
-
-class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
-    def __init__(
-        self,
-        num_its=100,
-        regularization=0.5,
-        cov_flag="l2",
-        zero_mean=True,
-        use_pca=False,
-        max_it_var=0.0001,
-    ):
-        self.base_model = MultiTaskLinear(
-            num_its=num_its,
-            regularization=regularization,
-            cov_flag=cov_flag,
-            zero_mean=zero_mean,
-            use_pca=use_pca,
-            max_it_var=max_it_var,
-        )
-        self.task_model = None
-
-    def fit_sessions(self, X_sessions, y_sessions):
-        self.base_model.fit_prior(X_sessions, y_sessions)
-        return self
-
-    def fit(self, X, y):
-        self.task_model = self.base_model.fit_new_task(X, y)
-        return self
-
-    def predict(self, X):
-        if self.task_model:
-            return self.task_model["predict"](X)
-        else:
-            return self.base_model.prior_predict(X)
-
-    def score(self, X, y):
-        from sklearn.metrics import accuracy_score
-
-        y_p = self.predict(X)
-        return accuracy_score(y, y_p)
-
 
 dataset = BNCI2014_001()
 dataset.subject_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -62,8 +18,6 @@ paradigm = LeftRightImagery(channels=["C1", "C2", "C3", "C4", "Cz", "CP1", "CP2"
 X_all, y_all, metadata = paradigm.get_data(dataset, subjects=dataset.subject_list, return_epochs=False)
 subjects = metadata["subject"].unique()
 sessions = metadata["session"].unique()
-
-X_all = notch_filter(X_all, 250, freqs=50)
 
 X_train = np.empty(len(subjects), dtype=object)
 X_test = np.empty(len(subjects), dtype=object)
@@ -91,7 +45,7 @@ for idx, subject in enumerate(subjects):
     y_train[idx] = y_sess_train.reshape(-1, 1)
     y_test[idx] = y_sess_test.reshape(-1, 1)
 
-clf = MultiTaskLinearClassifier(regularization=0.5, zero_mean=False)
+clf = MultiTaskLinearClassifier(regularization=0.5, zero_mean=False, cov_flag="l2")
 clf.fit_sessions(X_train, y_train)
 
 accuracies = []

@@ -1,25 +1,52 @@
 import numpy as np
 from scipy.signal import welch, detrend
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 
 def extract_welch_features(
-    data: np.ndarray, sfreq: float = 250, apply_log: bool = True, normalize: bool = True
+    data: np.ndarray,
+    sfreq: float = 250,
+    apply_log: bool = True,
 ) -> np.ndarray:
     """
-    Extracts log bandpower features using Welch's method.
+    Extracts frequency-domain features from EEG trials using Welch's method.
+
+    This function computes bandpower features from EEG signals by estimating
+    the power spectral density (PSD) for each channel using Welch's method.
+    The power within predefined frequency bands is averaged and optionally
+    log-transformed. These features are commonly used in motor imagery
+    classification and other brain-computer interface (BCI) tasks.
 
     Parameters:
-        data       : ndarray of shape (n_trials, n_channels, n_times)
-        sfreq      : Sampling frequency
-        bands      : List of (fmin, fmax) tuples. Defaults to mu/beta split.
-        apply_log  : Whether to apply log10 transform
-        normalize  : Whether to z-score features per trial
+        data : np.ndarray
+            EEG data array of shape (n_trials, n_channels, n_times),
+            where:
+              - n_trials   = number of epochs/trials
+              - n_channels = number of EEG channels
+              - n_times    = number of time samples per trial
+
+        sfreq : float, default=250
+            Sampling frequency of the EEG signal in Hz. Used to compute
+            the frequency resolution for Welch's method.
+
+        apply_log : bool, default=True
+            If True, applies a logarithmic transform (log1p) to the computed
+            bandpower to reduce skewness and stabilize variance. Useful when
+            features span several orders of magnitude.
 
     Returns:
-        features   : ndarray of shape (n_trials, n_channels * n_bands)
-    """
+        features : np.ndarray
+            Feature matrix of shape (n_trials, n_channels * n_bands),
+            where each feature corresponds to the average power in a specific
+            frequency band for a particular channel.
 
+    Notes:
+        - Welch's method is applied using a Hamming window with a maximum
+          segment length of 256 samples or the full trial duration (whichever is smaller).
+        - The bandpower is computed across the following 8 frequency bands:
+            (7-9), (9-11), (11-13), (13-15), (15-18), (18-21), (21-26), (26-30) Hz
+        - Features are returned unnormalized. Consider normalization if required by your model.
+        - Detrending is applied to each channel before PSD estimation to remove linear trends.
+    """
     bands = [
         (7, 9),
         (9, 11),
@@ -30,6 +57,7 @@ def extract_welch_features(
         (21, 26),
         (26, 30),
     ]
+
     n_trials, n_channels, n_times = data.shape
     features = []
 
@@ -37,7 +65,7 @@ def extract_welch_features(
         trial_features = []
         for ch in range(n_channels):
             signal = detrend(data[trial, ch])
-            freqs, Pxx = welch(signal, fs=sfreq, nperseg=min(256, n_times), window="hamming")
+            freqs, Pxx = welch(signal, fs=sfreq, nperseg=min(256, n_times), window="hamming", scaling="spectrum")
 
             for fmin, fmax in bands:
                 band_mask = (freqs >= fmin) & (freqs <= fmax)
@@ -46,13 +74,9 @@ def extract_welch_features(
                     continue
                 band_power = np.mean(Pxx[band_mask])
                 if apply_log:
-                    band_power = np.log10(band_power + 1e-10)
+                    band_power = np.log1p(band_power)
                 trial_features.append(band_power)
 
-        trial_features = np.array(trial_features)
-        if normalize:
-            trial_features = (trial_features - np.mean(trial_features)) / (np.std(trial_features) + 1e-10)
         features.append(trial_features)
 
-    features_array = np.array(features)
-    return features_array
+    return np.array(features)
