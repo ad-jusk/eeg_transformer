@@ -5,6 +5,15 @@ from eeg_logger import logger
 
 
 class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
+    """
+    Scikit-learn-compatible classifier designed to handle learning from multiple tasks and apply transfer learning to a new one.
+    It wraps around a base model and provides methods to:
+    - Fit a prior model using multiple sessions (fit_sessions)
+    - Adapt the prior to a new task (fit)
+    - Make predictions using either the prior or task-specific model (predict)
+    - Evaluate the accuracy (score)
+    """
+
     def __init__(
         self,
         num_its=100,
@@ -40,10 +49,20 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
         from sklearn.metrics import accuracy_score
 
         y_p = self.predict(X)
-        return accuracy_score(y, y_p)
+        return accuracy_score(y, y_p), y_p
 
 
 class MultiTaskLinear:
+    """
+    This class implements a Bayesian multi-task learning framework.
+    It learns a prior distribution (mean and covariance of weights) from multiple related tasks (sessions).
+    It can adapt this prior to a new task using Bayesian linear regression.
+    Prediction is done using either:
+    - A task-specific model (fit_new_task)
+    - A prior mean model (prior_predict)
+    The training involves estimating a Gaussian prior over weight vectors (mu, sigma) by solving regularized linear systems for each task,
+    then updating the prior iteratively until convergence
+    """
 
     def __init__(
         self,

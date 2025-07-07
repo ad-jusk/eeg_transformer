@@ -7,6 +7,10 @@ env/
 # Datasets folder
 data/
 epochs/
+features/
+
+# Results folder
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

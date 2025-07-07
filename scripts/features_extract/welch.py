@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.signal import welch, detrend
+from eeg_logger import logger
 
 
 def extract_welch_features(
@@ -13,8 +14,7 @@ def extract_welch_features(
     This function computes bandpower features from EEG signals by estimating
     the power spectral density (PSD) for each channel using Welch's method.
     The power within predefined frequency bands is averaged and optionally
-    log-transformed. These features are commonly used in motor imagery
-    classification and other brain-computer interface (BCI) tasks.
+    log-transformed.
 
     Parameters:
         data : np.ndarray
@@ -44,7 +44,6 @@ def extract_welch_features(
           segment length of 256 samples or the full trial duration (whichever is smaller).
         - The bandpower is computed across the following 8 frequency bands:
             (7-9), (9-11), (11-13), (13-15), (15-18), (18-21), (21-26), (26-30) Hz
-        - Features are returned unnormalized. Consider normalization if required by your model.
         - Detrending is applied to each channel before PSD estimation to remove linear trends.
     """
     bands = [
@@ -78,5 +77,7 @@ def extract_welch_features(
                 trial_features.append(band_power)
 
         features.append(trial_features)
+    features = np.array(features)
+    logger.info(f"Welch features extracted, vector's shape: {features.shape}")
 
     return np.array(features)
