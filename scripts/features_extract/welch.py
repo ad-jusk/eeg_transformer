@@ -80,4 +80,4 @@ def extract_welch_features(
     features = np.array(features)
     logger.info(f"Welch features extracted, vector's shape: {features.shape}")
 
-    return np.array(features)
+    return features
