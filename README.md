@@ -15,7 +15,17 @@ Install dependencies
 Install recommended extensions specified in  
 `extensions.json`
 
-# Scripts
+# Project structure
+
+## :file_folder: notebooks/
+
+This folder contains jupyter notebooks for multi-task learning algorithms and transformer models testing on different datasets. Check each notebook for more info.
+
+## :file_folder: scripts/
+
+This folder contains all model implementations, utilities and other useful scripts.
+
+## :warning: Deprecated scripts
 
 ### **download.py**
 
