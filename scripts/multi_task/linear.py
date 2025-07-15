@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from scipy.linalg import sqrtm
+from sklearn.metrics import accuracy_score
 from eeg_logger import logger
 
 
@@ -14,20 +15,14 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
     - Evaluate the accuracy (score)
     """
 
-    def __init__(
-        self,
-        num_its=100,
-        regularization=0.5,
-        cov_flag="l2",
-        zero_mean=True,
-        max_it_var=0.0001,
-    ):
+    def __init__(self, num_its=100, regularization=0.5, cov_flag="l2", zero_mean=True, max_it_var=0.0001, verbose=True):
         self.base_model = MultiTaskLinear(
             num_its=num_its,
             regularization=regularization,
             cov_flag=cov_flag,
             zero_mean=zero_mean,
             max_it_var=max_it_var,
+            verbose=verbose,
         )
         self.task_model = None
 
@@ -39,16 +34,14 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
         self.task_model = self.base_model.fit_new_task(X, y)
         return self
 
-    def predict(self, X):
+    def __predict(self, X):
         if self.task_model:
             return self.task_model["predict"](X)
         else:
             return self.base_model.prior_predict(X)
 
     def score(self, X, y):
-        from sklearn.metrics import accuracy_score
-
-        y_p = self.predict(X)
+        y_p = self.__predict(X)
         return accuracy_score(y, y_p), y_p
 
 
@@ -71,14 +64,15 @@ class MultiTaskLinear:
         cov_flag: str = "l2",
         zero_mean: bool = True,
         max_it_var: float = 0.0001,
+        verbose: bool = True,
     ):
         self.num_its = num_its
         self.regularization = regularization
         self.cov_flag = cov_flag
         self.zero_mean = zero_mean
         self.max_it_var = max_it_var
+        self.verbose = verbose
         self.prior = {}
-        self.label_mapping = {}
 
     def fit_prior(self, X: np.ndarray, y: np.ndarray):
         try:
@@ -86,11 +80,6 @@ class MultiTaskLinear:
         except ValueError as e:
             logger.error(f"Error occurred while validating dataset - {e}")
             return
-
-        self.label_mapping = {}
-        for i in range(len(y)):
-            y[i], mapping = self._encode_labels(y[i])
-            self.label_mapping[i] = mapping
 
         self._init_prior(X)
 
@@ -111,9 +100,10 @@ class MultiTaskLinear:
 
             is_converged, num = self._is_convergence(self.prior, prev_prior)
             if is_converged:
-                logger.info(f"Iteration {its} converged, error = {num}")
+                if self.verbose:
+                    logger.info(f"Iteration {its} converged, error = {num}")
                 break
-            else:
+            elif self.verbose:
                 logger.info(f"Iteration {its}, error = {num}")
 
         return self.prior
@@ -125,12 +115,12 @@ class MultiTaskLinear:
 
         out = {"lambda": self.regularization}
         X_original = X
-        y_internal, mapping = self._encode_labels(y)
-        out["w"], out["loss"] = self._fit_model(X, y_internal, out["lambda"], prior=self.prior)
+        out["w"], out["loss"] = self._fit_model(X, y, out["lambda"], prior=self.prior)
 
         def task_predict(X_test):
             raw_preds = np.sign(X_test.T @ out["w"])
-            return self._decode_labels(raw_preds, mapping)
+            raw_preds[raw_preds == 0] = 1
+            return raw_preds
 
         out["predict"] = task_predict
         out["train_acc"] = np.mean(y == out["predict"](X_original))
@@ -139,12 +129,8 @@ class MultiTaskLinear:
     def prior_predict(self, X: np.ndarray):
         mean_weights = np.mean(self.prior["W"], axis=1, keepdims=True)
         raw_preds = np.sign(X.T @ mean_weights)
-
-        if self.label_mapping:
-            mapping = list(self.label_mapping.values())[0]
-            return self._decode_labels(raw_preds, mapping)
-        else:
-            return raw_preds
+        raw_preds[raw_preds == 0] = 1
+        return raw_preds
 
     def _init_prior(self, X: np.ndarray):
         self.prior["regularization"] = self.regularization
@@ -174,6 +160,7 @@ class MultiTaskLinear:
             case "l1":
                 eta = 1e-4
                 D = sqrtm(temp @ temp.T + np.eye(temp.shape[0]) * eta)
+                D = np.real_if_close(D, tol=1e10)
                 C = D / np.trace(D)
             case "l2":
                 C = raw_cov
@@ -226,14 +213,3 @@ class MultiTaskLinear:
         residuals = X.T @ w - y
         L = np.linalg.norm(residuals, 2) ** 2 / len(y)
         return L
-
-    def _encode_labels(self, y):
-        classes = np.unique(y)
-        if len(classes) != 2:
-            raise ValueError("Only binary classification supported.")
-        mapping = {classes[0]: -1, classes[1]: 1}
-        return np.vectorize(mapping.get)(y), mapping
-
-    def _decode_labels(self, y_internal, mapping):
-        inv_mapping = {-1: list(mapping.keys())[0], 1: list(mapping.keys())[1]}
-        return np.vectorize(inv_mapping.get)(y_internal)
