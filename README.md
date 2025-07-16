@@ -15,7 +15,17 @@ Install dependencies
 Install recommended extensions specified in  
 `extensions.json`
 
-# Scripts
+# Project structure
+
+## :file_folder: notebooks/
+
+This folder contains jupyter notebooks for multi-task learning algorithms and transformer models testing on different datasets. Check each notebook for more info.
+
+## :file_folder: scripts/
+
+This folder contains all model implementations, utilities and other useful scripts.
+
+## :warning: Deprecated scripts
 
 ### **download.py**
 
@@ -26,7 +36,7 @@ If none is provided, it will download all datasets. Supported dataset names are:
 `bci2b` - for BCI Competition IV 2b  
 `physionet` - for Physionet
 
-### **preprocess.py**
+### **epochs.py**
 
 This script extracts expochs for selected dataset and saves them in predefined directory. It accepts dataset name as a starting param. If none is provided, it will not do anything. Supported dataset names are:  
 `bci3a` - for BCI Competition III 3a  
@@ -36,7 +46,7 @@ This script extracts expochs for selected dataset and saves them in predefined d
 
 ### **train.py**
 
-This scrips performs 5 fold cross validation for selected model. The final model accuracy is mean from all 5 fold accuracies. Model name is accepted as a starting param. If none is provided, it will not do anything. Supported model names are:  
+This scrips performs 5 fold cross validation for selected transformer model. The final model accuracy is mean from all 5 fold accuracies. Model name is accepted as a starting param. If none is provided, it will not do anything. Supported model names are:  
 `spatial` - for SpatialTransformer  
 `temporal` - for TemporalTransformer  
 `spatialcnn` - for SpatialCNNTransformer  

@@ -27,7 +27,7 @@ def extract_epochs(data_path: str, save_path_root: str) -> None:
         return
 
     save_directory: str = __create_save_directory(save_path_root)
-    subject_folders = [f for f in os.listdir(data_path)]
+    subject_folders = [f for f in os.listdir(data_path) if "S01" not in f.upper()]
 
     for subject in subject_folders:
         subject_dir = os.path.join(data_path, subject)
@@ -38,7 +38,7 @@ def extract_epochs(data_path: str, save_path_root: str) -> None:
         train_data_files = [f for f in os.listdir(subject_dir) if f.endswith("T.gdf")]
         logger.info(f"Reading data from {subject}...")
 
-        for idx, train_file in enumerate(train_data_files[:2], start=1):
+        for idx, train_file in enumerate(train_data_files, start=1):
             train_file_path = os.path.join(subject_dir, train_file)
 
             raw_train = mne.io.read_raw_gdf(train_file_path, eog=["EOG-left", "EOG-central", "EOG-right"], preload=True)
