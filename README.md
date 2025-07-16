@@ -25,6 +25,17 @@ This folder contains jupyter notebooks for multi-task learning algorithms and tr
 
 This folder contains all model implementations, utilities and other useful scripts.
 
+## :pencil: Accuracies so far
+
+| Model                                      |  Dataset   |    Evaluation | Accuracy (%) |
+| :----------------------------------------- | :--------: | ------------: | -----------: |
+| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-session |           77 |
+| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-subject |           74 |
+| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-session |           79 |
+| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-subject |           77 |
+| MultiTaskLinearClassifier                  | BCI IV 2a  | Cross-session |           69 |
+| MultiTaskLinearClassifierWithDataSelection | BCI IV 2a  | Cross-session |           74 |
+
 ## :warning: Deprecated scripts
 
 ### **download.py**
