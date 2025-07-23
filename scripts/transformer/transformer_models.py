@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from scripts.models.positional_encoding import PositionalEncoding
-from scripts.models.transformer_block import TransformerBlock
+from scripts.transformer.positional_encoding import PositionalEncoding
+from scripts.transformer.transformer_block import TransformerBlock
 
 
 """
