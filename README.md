@@ -42,16 +42,16 @@ This folder contains all model implementations, utilities and other useful scrip
 
 | Model                  | Dataset   | Finetuning               | Run 1 (%) | Run 2 (%) | Run 3 (%) | Run 4 (%) | Run 5 (%) | Mean (%)    |
 | ---------------------- | --------- | ------------------------ | --------- | --------- | --------- | --------- | --------- | ----------- |
-| SpatialTransformer     | Physionet | :heavy_multiplication_x: | 56.55     | 58.69     | 57.62     | 57.38     | 56.19     | 57.29+-0.98 |
-| SpatialTransformer     | Physionet | :heavy_check_mark:       | 63.93     | 62.74     | 62.50     | 64.40     | 62.98     | 63.31+-0.82 |
-| TemporalTransformer    | Physionet | :heavy_multiplication_x: | 66.43     | 63.93     | 64.88     | 64.52     | 66.67     | 65.29+-1.20 |
-| TemporalTransformer    | Physionet | :heavy_check_mark:       | 68.45     | 65.71     | 66.67     | 67.02     | 67.14     | 67.00+-0.99 |
-| SpatialCNNTransformer  | Physionet | :heavy_multiplication_x: | 61.79     | 62.26     | 61.79     | 62.62     | 63.57     | 62.40+-0.74 |
-| SpatialCNNTransformer  | Physionet | :heavy_check_mark:       | 66.43     | 66.19     | 68.10     | 65.71     | 68.69     | 67.02+-1.29 |
-| TemporalCNNTransformer | Physionet | :heavy_multiplication_x: | 57.14     | 61.67     | 55.95     | 59.52     | 58.81     | 58.62+-2.20 |
-| TemporalCNNTransformer | Physionet | :heavy_check_mark:       | 64.29     | 64.88     | 66.79     | 64.76     | 66.07     | 65.36+-1.03 |
-| FusionCnnTransformer   | Physionet | :heavy_multiplication_x: | 61.31     | 61.90     | 61.19     | 60.95     | 62.26     | 61.52+-0.54 |
-| FusionCnnTransformer   | Physionet | :heavy_check_mark:       | 64.52     | 66.07     | 67.38     | 65.95     | 67.26     | 66.24+-1.16 |
+| SpatialTransformer     | Physionet | :heavy_multiplication_x: | 54.17     | 55.60     | 57.02     | 55.48     | 57.26     | 55.90+-1.13 |
+| SpatialTransformer     | Physionet | :heavy_check_mark:       | 63.93     | 61.79     | 62.26     | 61.31     | 61.79     | 62.21+-0.91 |
+| TemporalTransformer    | Physionet | :heavy_multiplication_x: | 65.48     | 64.64     | 65.95     | 63.57     | 64.17     | 64.76+-0.86 |
+| TemporalTransformer    | Physionet | :heavy_check_mark:       | 65.83     | 68.10     | 66.43     | 66.19     | 67.26     | 66.76+-0.82 |
+| SpatialCNNTransformer  | Physionet | :heavy_multiplication_x: | 60.71     | 61.31     | 60.48     | 62.14     | 60.83     | 61.10+-0.59 |
+| SpatialCNNTransformer  | Physionet | :heavy_check_mark:       | 66.55     | 68.21     | 67.14     | 67.38     | 69.52     | 67.76+-1.03 |
+| TemporalCNNTransformer | Physionet | :heavy_multiplication_x: | 58.81     | 59.88     | 57.74     | 59.88     | 58.81     | 59.02+-0.80 |
+| TemporalCNNTransformer | Physionet | :heavy_check_mark:       | 65.60     | 66.90     | 65.95     | 66.79     | 67.98     | 66.64+-0.83 |
+| FusionCnnTransformer   | Physionet | :heavy_multiplication_x: | 61.07     | 61.43     | 61.43     | 64.17     | 63.33     | 62.29+-1.23 |
+| FusionCnnTransformer   | Physionet | :heavy_check_mark:       | 67.38     | 64.88     | 65.36     | 65.48     | 66.67     | 65.95+-0.93 |
 
 ## :warning: Deprecated scripts
 
