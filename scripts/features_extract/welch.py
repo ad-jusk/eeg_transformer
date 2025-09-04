@@ -43,7 +43,7 @@ def extract_welch_features(
         - Welch's method is applied using a Hamming window with a maximum
           segment length of 256 samples or the full trial duration (whichever is smaller).
         - The bandpower is computed across the following 8 frequency bands:
-            (7-9), (9-11), (11-13), (13-15), (15-18), (18-21), (21-26), (26-30) Hz
+            (8-9), (9-11), (11-13), (13-15), (15-18), (18-21), (21-26), (26-32) Hz
         - Detrending is applied to each channel before PSD estimation to remove linear trends.
     """
     bands = [
