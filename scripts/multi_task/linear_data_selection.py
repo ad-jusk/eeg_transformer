@@ -31,8 +31,8 @@ class MultiTaskLinearWithSelectionClassifier(BaseEstimator, ClassifierMixin):
         self.base_model.fit_prior(X_sessions, y_sessions)
         return self
 
-    def fit(self, X, y):
-        self.task_model = self.base_model.fit_new_task(X, y)
+    def update_based_on_new_data(self, X, y):
+        self.base_model.update(X, y)
         return self
 
     def __predict(self, X):
@@ -65,15 +65,13 @@ class MultiTaskLinearWithDataSelection(MultiTaskLinear):
         self.verbose = verbose
         self.prior = {}
 
-    @override
-    def fit_new_task(self, X: np.ndarray, y: np.ndarray) -> dict:
+    def update(self, X: np.ndarray, y: np.ndarray) -> dict:
         if X.shape[0] != max(self.prior["mu"].shape):
             logger.error("Feature dimensionality of the data does not match this model")
             return {}
 
         prior = self.prior
         mu = prior["mu"]
-        sigma = prior["sigma"]
         W = prior["W"]
         selected_weights = []
 
@@ -94,24 +92,4 @@ class MultiTaskLinearWithDataSelection(MultiTaskLinear):
             selected_weights.append(w_n)
             new_W = np.concatenate(selected_weights, axis=1)
             prior = self._update_gaussian_prior(new_W)
-            mu_diff = np.linalg.norm(prior["mu"] - mu)
-            sigma_diff = np.linalg.norm(prior["sigma"] - sigma)
-
-            if self.verbose:
-                logger.info(f"Updated prior. mu new - mu old = {mu_diff:.4f}, sigma new - sigma old = {sigma_diff:.4f}")
-
-        # Re-fit using updated prior
-        w_n, loss = self._fit_model(X, y, self.regularization, prior=prior)
-
-        def task_predict(X_test):
-            raw_preds = np.sign(X_test.T @ w_n)
-            raw_preds[raw_preds == 0] = 1
-            return raw_preds
-
-        return {
-            "w": w_n,
-            "loss": loss,
-            "predict": task_predict,
-            "train_acc": np.mean(y == task_predict(X)),
-            "lambda": self.regularization,
-        }
+            self.prior = prior

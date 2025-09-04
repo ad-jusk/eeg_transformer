@@ -47,14 +47,14 @@ def extract_welch_features(
         - Detrending is applied to each channel before PSD estimation to remove linear trends.
     """
     bands = [
-        (7, 9),
+        (8, 9),
         (9, 11),
         (11, 13),
         (13, 15),
         (15, 18),
         (18, 21),
         (21, 26),
-        (26, 30),
+        (26, 32),
     ]
 
     n_trials, n_channels, n_times = data.shape
