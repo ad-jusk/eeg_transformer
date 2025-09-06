@@ -1,4 +1,3 @@
-from typing import override
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from eeg_logger import logger
@@ -17,7 +16,7 @@ class MultiTaskLinearWithSelectionClassifier(BaseEstimator, ClassifierMixin):
     """
 
     def __init__(self, num_its=100, regularization=0.5, cov_flag="l2", zero_mean=True, max_it_var=0.0001, verbose=True):
-        self.base_model = MultiTaskLinearWithDataSelection(
+        self.base_model = MultiTaskLinear(
             num_its=num_its,
             regularization=regularization,
             cov_flag=cov_flag,
@@ -27,12 +26,37 @@ class MultiTaskLinearWithSelectionClassifier(BaseEstimator, ClassifierMixin):
         )
         self.task_model = None
 
-    def fit_sessions(self, X_sessions, y_sessions):
-        self.base_model.fit_prior(X_sessions, y_sessions)
-        return self
+    def fit_sessions_with_selection(self, X_sessions, y_sessions, X_new, y_new):
 
-    def update_based_on_new_data(self, X, y):
-        self.base_model.update(X, y)
+        self.base_model.fit_prior(X_sessions, y_sessions)
+
+        prior = self.base_model.prior
+        mu = prior["mu"]
+        selected_datasets = []
+        selected_labels = []
+
+        # Compute w_n using the current prior
+        w_n, _ = self.base_model._fit_model(X_new, y_new, self.base_model.regularization, prior=prior)
+
+        # Select weights that are close to w_n
+        for i in range(X_sessions.shape[0]):
+            w_s, _ = self.base_model._fit_model(
+                X_sessions[i], y_sessions[i], self.base_model.regularization, prior=prior
+            )
+            if np.linalg.norm(w_s - w_n) <= np.linalg.norm(w_n - mu):
+                selected_datasets.append(X_sessions[i])
+                selected_labels.append(y_sessions[i])
+
+        # At least 2 similar datasets are needed
+        if len(selected_datasets) >= 2:
+            X = np.empty(len(selected_datasets), dtype=object)
+            y = np.empty(len(selected_labels), dtype=object)
+            for i in range(len(selected_datasets)):
+                X[i] = selected_datasets[i]
+                y[i] = selected_labels[i]
+
+            self.base_model.fit_prior(X, y)
+
         return self
 
     def __predict(self, X):
@@ -44,52 +68,3 @@ class MultiTaskLinearWithSelectionClassifier(BaseEstimator, ClassifierMixin):
     def score(self, X, y):
         y_p = self.__predict(X)
         return accuracy_score(y, y_p), y_p
-
-
-class MultiTaskLinearWithDataSelection(MultiTaskLinear):
-
-    def __init__(
-        self,
-        num_its: int = 100,
-        regularization: float = 0.5,
-        cov_flag: str = "l2",
-        zero_mean: bool = True,
-        max_it_var: float = 0.0001,
-        verbose: bool = True,
-    ):
-        self.num_its = num_its
-        self.regularization = regularization
-        self.cov_flag = cov_flag
-        self.zero_mean = zero_mean
-        self.max_it_var = max_it_var
-        self.verbose = verbose
-        self.prior = {}
-
-    def update(self, X: np.ndarray, y: np.ndarray) -> dict:
-        if X.shape[0] != max(self.prior["mu"].shape):
-            logger.error("Feature dimensionality of the data does not match this model")
-            return {}
-
-        prior = self.prior
-        mu = prior["mu"]
-        W = prior["W"]
-        selected_weights = []
-
-        # Compute w_n using the current prior
-        w_n, _ = self._fit_model(X, y, self.regularization, prior=prior)
-
-        # Select weights that are close to w_n
-        for i in range(W.shape[1]):
-            w_s = W[:, i : i + 1]
-            if np.linalg.norm(w_s - w_n) <= np.linalg.norm(w_n - mu):
-                selected_weights.append(w_s)
-
-        if self.verbose:
-            logger.info(f"Selected {len(selected_weights)} prior tasks out of {W.shape[1]} for new task adaptation.")
-
-        # Update prior using selected w_s and w_n
-        if selected_weights:
-            selected_weights.append(w_n)
-            new_W = np.concatenate(selected_weights, axis=1)
-            prior = self._update_gaussian_prior(new_W)
-            self.prior = prior
