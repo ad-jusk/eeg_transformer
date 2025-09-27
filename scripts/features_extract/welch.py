@@ -4,6 +4,7 @@ from eeg_logger import logger
 
 
 def extract_welch_features(
+    bands: list[tuple[int, int]],
     data: np.ndarray,
     sfreq: float = 250,
     apply_log: bool = True,
@@ -17,6 +18,9 @@ def extract_welch_features(
     log-transformed.
 
     Parameters:
+        bands: list[tuple[int, int]]
+            bands for Welch method
+
         data : np.ndarray
             EEG data array of shape (n_trials, n_channels, n_times),
             where:
@@ -38,24 +42,7 @@ def extract_welch_features(
             Feature matrix of shape (n_trials, n_channels * n_bands),
             where each feature corresponds to the average power in a specific
             frequency band for a particular channel.
-
-    Notes:
-        - Welch's method is applied using a Hamming window with a maximum
-          segment length of 256 samples or the full trial duration (whichever is smaller).
-        - The bandpower is computed across the following 8 frequency bands:
-            (8-9), (9-11), (11-13), (13-15), (15-18), (18-21), (21-26), (26-32) Hz
-        - Detrending is applied to each channel before PSD estimation to remove linear trends.
     """
-    bands = [
-        (8, 9),
-        (9, 11),
-        (11, 13),
-        (13, 15),
-        (15, 18),
-        (18, 21),
-        (21, 26),
-        (26, 32),
-    ]
 
     n_trials, n_channels, n_times = data.shape
     features = []
@@ -63,14 +50,11 @@ def extract_welch_features(
     for trial in range(n_trials):
         trial_features = []
         for ch in range(n_channels):
-            signal = detrend(data[trial, ch])
-            freqs, Pxx = welch(signal, fs=sfreq, nperseg=min(256, n_times), window="hamming", scaling="spectrum")
-
+            freqs, Pxx = welch(
+                data[trial, ch], fs=sfreq, nperseg=min(256, n_times), window="hamming", scaling="density"
+            )
             for fmin, fmax in bands:
                 band_mask = (freqs >= fmin) & (freqs <= fmax)
-                if not np.any(band_mask):
-                    trial_features.append(0.0)
-                    continue
                 band_power = np.mean(Pxx[band_mask])
                 if apply_log:
                     band_power = np.log1p(band_power)

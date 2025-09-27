@@ -15,7 +15,9 @@ class MultiTaskLinearClassifier(BaseEstimator, ClassifierMixin):
     - Evaluate the accuracy (score)
     """
 
-    def __init__(self, num_its=100, regularization=0.5, cov_flag="l2", zero_mean=True, max_it_var=0.0001, verbose=True):
+    def __init__(
+        self, num_its=100, regularization=0.5, cov_flag="l2", zero_mean=True, max_it_var=0.0001, verbose=False
+    ):
         self.base_model = MultiTaskLinear(
             num_its=num_its,
             regularization=regularization,
