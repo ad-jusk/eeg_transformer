@@ -27,31 +27,16 @@ This folder contains all model implementations, utilities and other useful scrip
 
 ## :pencil: Accuracies so far
 
-### Multi-task learning
+### Multi-task learning algorithms
 
 | Model                                      | Dataset    | Evaluation    | Accuracy (%) |
 | ------------------------------------------ | ---------- | ------------- | ------------ |
-| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-session | 77           |
-| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-subject | 74           |
-| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-session | 79           |
-| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-subject | 77           |
-| MultiTaskLinearClassifier                  | BCI IV 2a  | Cross-session | 69           |
-| MultiTaskLinearClassifierWithDataSelection | BCI IV 2a  | Cross-session | 74           |
-
-### Transformers
-
-| Model                  | Dataset   | Finetuning               | Run 1 (%) | Run 2 (%) | Run 3 (%) | Run 4 (%) | Run 5 (%) | Mean (%)    |
-| ---------------------- | --------- | ------------------------ | --------- | --------- | --------- | --------- | --------- | ----------- |
-| SpatialTransformer     | Physionet | :heavy_multiplication_x: | 54.17     | 55.60     | 57.02     | 55.48     | 57.26     | 55.90+-1.13 |
-| SpatialTransformer     | Physionet | :heavy_check_mark:       | 63.93     | 61.79     | 62.26     | 61.31     | 61.79     | 62.21+-0.91 |
-| TemporalTransformer    | Physionet | :heavy_multiplication_x: | 65.48     | 64.64     | 65.95     | 63.57     | 64.17     | 64.76+-0.86 |
-| TemporalTransformer    | Physionet | :heavy_check_mark:       | 65.83     | 68.10     | 66.43     | 66.19     | 67.26     | 66.76+-0.82 |
-| SpatialCNNTransformer  | Physionet | :heavy_multiplication_x: | 60.71     | 61.31     | 60.48     | 62.14     | 60.83     | 61.10+-0.59 |
-| SpatialCNNTransformer  | Physionet | :heavy_check_mark:       | 66.55     | 68.21     | 67.14     | 67.38     | 69.52     | 67.76+-1.03 |
-| TemporalCNNTransformer | Physionet | :heavy_multiplication_x: | 58.81     | 59.88     | 57.74     | 59.88     | 58.81     | 59.02+-0.80 |
-| TemporalCNNTransformer | Physionet | :heavy_check_mark:       | 65.60     | 66.90     | 65.95     | 66.79     | 67.98     | 66.64+-0.83 |
-| FusionCnnTransformer   | Physionet | :heavy_multiplication_x: | 61.07     | 61.43     | 61.43     | 64.17     | 63.33     | 62.29+-1.23 |
-| FusionCnnTransformer   | Physionet | :heavy_check_mark:       | 67.38     | 64.88     | 65.36     | 65.48     | 66.67     | 65.95+-0.93 |
+| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-session | 78.75        |
+| MultiTaskLinearClassifier                  | BCI 2008 B | Cross-subject | 75.28        |
+| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-session | 78.26        |
+| MultiTaskLinearClassifierWithDataSelection | BCI 2008 B | Cross-subject | 75.55        |
+| MultiTaskLinearClassifier                  | BCI IV 2a  | Cross-session | 70.45        |
+| MultiTaskLinearClassifierWithDataSelection | BCI IV 2a  | Cross-session | 70.45        |
 
 ## :warning: Deprecated scripts
 
