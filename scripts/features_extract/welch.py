@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.signal import welch, detrend
+from scipy.signal import welch
 from eeg_logger import logger
 
 
@@ -50,9 +50,7 @@ def extract_welch_features(
     for trial in range(n_trials):
         trial_features = []
         for ch in range(n_channels):
-            freqs, Pxx = welch(
-                data[trial, ch], fs=sfreq, nperseg=min(256, n_times), window="hamming", scaling="density"
-            )
+            freqs, Pxx = welch(data[trial, ch], fs=sfreq, nperseg=256, window="hamming")
             for fmin, fmax in bands:
                 band_mask = (freqs >= fmin) & (freqs <= fmax)
                 band_power = np.mean(Pxx[band_mask])
