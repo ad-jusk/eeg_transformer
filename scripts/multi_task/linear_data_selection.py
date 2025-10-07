@@ -47,6 +47,17 @@ class MultiTaskLinearWithSelectionClassifier(BaseEstimator, ClassifierMixin):
                 selected_datasets.append(X_sessions[i])
                 selected_labels.append(y_sessions[i])
 
+        # Prior requires that there are at least 2 datasets so we split in half if there is one
+        if len(selected_datasets) == 1:
+            temp_data = []
+            temp_labels = []
+            temp_data.append(selected_datasets[0][:, : selected_datasets[0].shape[1] // 2])
+            temp_data.append(selected_datasets[0][:, selected_datasets[0].shape[1] // 2 :])
+            temp_labels.append(selected_labels[0][: selected_labels[0].shape[0] // 2])
+            temp_labels.append(selected_labels[0][selected_labels[0].shape[0] // 2 :])
+            selected_datasets = temp_data
+            selected_labels = temp_labels
+
         # At least 2 similar datasets are needed
         if len(selected_datasets) >= 2:
             X = np.empty(len(selected_datasets), dtype=object)
